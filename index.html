@@ -2,11 +2,18 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>2.5D Dual Racer</title>
+  <title>Circular Drift Duel</title>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { width: 100%; height: 100%; background: #4CAF50; overflow: hidden; }
-    canvas { display: block; margin: auto; background: #4CAF50; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #88e063;
+    }
+    canvas {
+      display: block;
+      background: #88e063;
+    }
   </style>
 </head>
 <body>
@@ -14,123 +21,115 @@
 <script>
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
-canvas.width = 400;
-canvas.height = 600;
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
 
-let trackSpeed = 4;
-let finishLineY = -2000;
+const centerX = canvas.width / 2;
+const centerY = canvas.height / 2;
+const trackRadius = 250;
+const carSize = 30;
 let gameOver = false;
 let winner = "";
 
-const carImg1 = new Image();
-const carImg2 = new Image();
-carImg1.src = "https://i.imgur.com/8QfZmrG.png"; // Red car
-carImg2.src = "https://i.imgur.com/1nQU0Yt.png"; // Orange car
-
-const player1 = {
-  x: 100,
-  y: 500,
-  w: 50,
-  h: 100,
-  color: "red",
-  img: carImg1,
-  up: "w",
-  down: "s",
-  left: "a",
-  right: "d",
-  vy: 0,
-};
-
-const player2 = {
-  x: 250,
-  y: 500,
-  w: 50,
-  h: 100,
-  color: "orange",
-  img: carImg2,
-  up: "ArrowUp",
-  down: "ArrowDown",
-  left: "ArrowLeft",
-  right: "ArrowRight",
-  vy: 0,
-};
-
-const keys = {};
-document.addEventListener("keydown", e => keys[e.key] = true);
-document.addEventListener("keyup", e => keys[e.key] = false);
-
-function drawTrack() {
-  ctx.fillStyle = "#333";
-  ctx.fillRect(75, 0, 250, canvas.height);
-
-  ctx.strokeStyle = "white";
-  ctx.lineWidth = 4;
-  for (let y = 0; y < canvas.height; y += 40) {
-    ctx.beginPath();
-    ctx.moveTo(150, y);
-    ctx.lineTo(150, y + 20);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(250, y);
-    ctx.lineTo(250, y + 20);
-    ctx.stroke();
+const players = [
+  {
+    angle: 0,
+    color: "#ff5050",
+    keys: { left: "a", right: "d" },
+    speed: 0.02,
+    laps: 0,
+    lastAngle: 0
+  },
+  {
+    angle: Math.PI,
+    color: "#3399ff",
+    keys: { left: "ArrowLeft", right: "ArrowRight" },
+    speed: 0.02,
+    laps: 0,
+    lastAngle: Math.PI
   }
+];
 
-  // Finish Line
-  if (finishLineY < canvas.height) {
-    ctx.fillStyle = "white";
-    for (let i = 75; i < 325; i += 20) {
-      ctx.fillRect(i, finishLineY, 10, 10);
+const keysPressed = {};
+document.addEventListener("keydown", e => keysPressed[e.key] = true);
+document.addEventListener("keyup", e => keysPressed[e.key] = false);
+
+function updatePlayer(player) {
+  if (keysPressed[player.keys.left]) player.angle -= player.speed;
+  if (keysPressed[player.keys.right]) player.angle += player.speed;
+
+  // Lap detection
+  if (player.lastAngle > Math.PI * 1.5 && player.angle < Math.PI * 0.5) {
+    player.laps++;
+    if (player.laps >= 3 && !gameOver) {
+      gameOver = true;
+      winner = `${player.color.toUpperCase()} CAR WINS!`;
     }
   }
+  player.lastAngle = player.angle;
 }
 
-function movePlayer(p) {
-  if (keys[p.up]) p.y -= 5;
-  if (keys[p.down]) p.y += 5;
-  if (keys[p.left]) p.x -= 5;
-  if (keys[p.right]) p.x += 5;
+function drawTrack() {
+  ctx.save();
+  ctx.translate(centerX, centerY);
 
-  // keep on road
-  p.x = Math.max(80, Math.min(270, p.x));
+  // Outer Circle
+  ctx.fillStyle = "#333";
+  ctx.beginPath();
+  ctx.arc(0, 0, trackRadius, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Inner Circle
+  ctx.fillStyle = "#88e063";
+  ctx.beginPath();
+  ctx.arc(0, 0, trackRadius - 50, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
 }
 
-function drawPlayer(p) {
-  ctx.drawImage(p.img, p.x, p.y, p.w, p.h);
+function drawPlayer(player) {
+  const x = centerX + Math.cos(player.angle) * (trackRadius - 25);
+  const y = centerY + Math.sin(player.angle) * (trackRadius - 25);
+
+  ctx.fillStyle = player.color;
+  ctx.beginPath();
+  ctx.arc(x, y, carSize / 2, 0, Math.PI * 2);
+  ctx.fill();
 }
 
-function checkWinner(p, name) {
-  if (p.y <= finishLineY + 50 && !gameOver) {
-    gameOver = true;
-    winner = `${name.toUpperCase()} WINS!`;
-  }
+function drawFinishLine() {
+  ctx.strokeStyle = "white";
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(centerX - 10, centerY - trackRadius);
+  ctx.lineTo(centerX + 10, centerY - trackRadius);
+  ctx.stroke();
 }
 
-function update() {
+function drawWinnerText() {
   if (gameOver) {
-    ctx.fillStyle = "black";
-    ctx.font = "40px sans-serif";
-    ctx.fillText(winner, 80, 300);
-    ctx.font = "20px sans-serif";
-    ctx.fillText("Refresh to play again", 110, 340);
-    return;
+    ctx.fillStyle = "#000";
+    ctx.font = "48px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(winner, canvas.width / 2, 60);
   }
+}
 
+function gameLoop() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   drawTrack();
-  movePlayer(player1);
-  movePlayer(player2);
-  drawPlayer(player1);
-  drawPlayer(player2);
-
-  finishLineY += trackSpeed;
-  checkWinner(player1, "Red Car");
-  checkWinner(player2, "Orange Car");
-
-  requestAnimationFrame(update);
+  drawFinishLine();
+  players.forEach(p => {
+    updatePlayer(p);
+    drawPlayer(p);
+  });
+  drawWinnerText();
+  requestAnimationFrame(gameLoop);
 }
 
-update();
+gameLoop();
 </script>
 </body>
 </html>
+
